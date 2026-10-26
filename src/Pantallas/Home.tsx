@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../Navegacion/StackNavigator';
-import { supabase } from '../config/supabase';
-import { obtenerRol, Rol } from '../config/authService';  
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { supabase } from '../services/supabaseClient';
+import { obtenerRol, Rol } from '../config/authService'; 
 import { colores } from '../config/tema';
 import Boton from '../Componentes/Boton';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 type Producto = {
   id: number;
@@ -17,12 +13,11 @@ type Producto = {
   categoria: string | null;
 };
 
-export default function Home({ navigation }: Props) {
+export default function Home({ navigation }: any) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 👇 NUEVO: estados y efecto para saber quién entró
   const [rol, setRol] = useState<Rol>('desconocido');
   const [nombreUsuario, setNombreUsuario] = useState('');
 
@@ -32,7 +27,6 @@ export default function Home({ navigation }: Props) {
       setNombreUsuario(nombre);
     });
   }, []);
-  // 👆 FIN DE LO NUEVO
 
   useEffect(() => {
     const cargar = async () => {
@@ -56,10 +50,22 @@ export default function Home({ navigation }: Props) {
     <View style={styles.contenedor}>
       <Text style={styles.titulo}>Menú</Text>
 
-      {/* 👇 NUEVO: saludo con el rol */}
       <Text style={{ color: colores.gris, marginBottom: 12 }}>
         Hola {nombreUsuario || 'usuario'} · {rol}
       </Text>
+
+      {/* Acceso a la gestión de Mis Pedidos */}
+      <TouchableOpacity 
+        style={styles.cardPedidos}
+        onPress={() => navigation.navigate('MisPedidos')}
+      >
+        <Text style={{ fontSize: 20, marginRight: 10 }}>📦</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.tituloPedidos}>Mis Pedidos</Text>
+          <Text style={styles.subtituloPedidos}>Ver y gestionar mis pedidos activos</Text>
+        </View>
+        <Text style={{ fontSize: 18, color: colores.primario }}>➔</Text>
+      </TouchableOpacity>
 
       {cargando && <ActivityIndicator size="large" color={colores.primario} />}
       {error && <Text style={styles.error}>Error: {error}</Text>}
@@ -87,7 +93,19 @@ export default function Home({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   contenedor: { flex: 1, padding: 20, paddingTop: 56, backgroundColor: colores.fondo },
-  titulo: { fontSize: 28, fontWeight: '800', color: colores.texto, marginBottom: 16 },
+  titulo: { fontSize: 28, fontWeight: '800', color: colores.texto, marginBottom: 8 },
+  cardPedidos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colores.blanco,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colores.borde,
+  },
+  tituloPedidos: { fontSize: 15, fontWeight: '700', color: colores.texto },
+  subtituloPedidos: { fontSize: 12, color: colores.gris },
   tarjeta: {
     flexDirection: 'row',
     backgroundColor: colores.blanco,
