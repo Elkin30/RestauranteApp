@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../config/supabase';
 import { obtenerRol, Rol } from '../config/authService'; 
 import { colores } from '../config/tema';
 import Boton from '../Componentes/Boton';

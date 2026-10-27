@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../config/supabase';
 
 interface HeaderProps {
   titulo: string;

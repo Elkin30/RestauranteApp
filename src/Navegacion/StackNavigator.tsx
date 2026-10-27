@@ -5,14 +5,21 @@ import Registro from '../Pantallas/Registro';
 import Home from '../Pantallas/Home';
 import { MisPedidos } from '../Pantallas/MisPedidos';
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Login: undefined;
+  Registro: undefined;
+  Home: undefined;
+  MisPedidos: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const StackNavigator = () => {
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       initialRouteName="Login"
-      screenOptions={{ 
-        headerShown: false 
+      screenOptions={{
+        headerShown: false,
       }}
     >
       <Stack.Screen name="Login" component={Login as any} />
@@ -22,3 +29,5 @@ export const StackNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+export default StackNavigator;
