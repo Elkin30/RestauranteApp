@@ -42,9 +42,8 @@ export default function Home({ navigation }: any) {
   }, []);
 
   const cerrarSesion = async () => {
-    await supabase.auth.signOut();
-    navigation.replace('Login');
-  };
+  await supabase.auth.signOut();
+};
 
   return (
     <View style={styles.contenedor}>

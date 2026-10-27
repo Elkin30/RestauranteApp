@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../Navegacion/StackNavigator';
 import { supabase } from '../config/supabase';
 import { colores } from '../config/tema';
+import { esEmailValido, mensajeErrorAuth, PASSWORD_MIN } from '../config/validaciones';
 import Boton from '../Componentes/Boton';
 import CampoTexto from '../Componentes/CampoTexto';
 
@@ -13,20 +14,31 @@ export default function Login({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const iniciarSesion = async () => {
-    if (!email || !password) {
-      Alert.alert('Faltan datos', 'Escribe tu correo y contraseña.');
+    setError(null);
+    if (!esEmailValido(email)) {
+      setError('Escribe un correo válido.');
+      return;
+    }
+    if (password.length < PASSWORD_MIN) {
+      setError(`La contraseña debe tener mínimo ${PASSWORD_MIN} caracteres.`);
       return;
     }
     setCargando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setCargando(false);
-    if (error) {
-      Alert.alert('No se pudo iniciar sesión', error.message);
-      return;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) setError(mensajeErrorAuth(error.message));
+      // Si sale bien, AuthContext detecta la sesión y la app pasa sola al Home.
+    } catch {
+      setError('No hay conexión con el servidor. Revisa tu internet.');
+    } finally {
+      setCargando(false);
     }
-    navigation.replace('Home');
   };
 
   return (
@@ -48,6 +60,8 @@ export default function Login({ navigation }: Props) {
         secureTextEntry
       />
 
+      {error && <Text style={styles.error}>{error}</Text>}
+
       <Boton titulo="Entrar" onPress={iniciarSesion} cargando={cargando} />
       <View style={{ height: 12 }} />
       <Boton titulo="Crear cuenta" onPress={() => navigation.navigate('Registro')} secundario />
@@ -59,4 +73,5 @@ const styles = StyleSheet.create({
   contenedor: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colores.fondo },
   titulo: { fontSize: 32, fontWeight: '800', color: colores.primario, textAlign: 'center' },
   subtitulo: { fontSize: 16, color: colores.gris, textAlign: 'center', marginBottom: 32 },
+  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
 });
