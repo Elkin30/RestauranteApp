@@ -43,23 +43,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   // 2. Cargar el rol cuando cambia el usuario
+  //    (sin usuario no se consulta nada: rol y nombre se calculan abajo)
   const recargarRol = useCallback(async () => {
-    if (!userId) {
-      setRol('desconocido');
-      setNombre('');
-      setRolDe(null);
-      return;
-    }
-    try {
-      const r = await obtenerRol();
-      setRol(r.rol);
-      setNombre(r.nombre);
-    } catch {
-      setRol('desconocido');
-      setNombre('');
-    } finally {
-      setRolDe(userId);
-    }
+    if (!userId) return;
+    await obtenerRol()
+      .then((r) => {
+        setRol(r.rol);
+        setNombre(r.nombre);
+      })
+      .catch(() => {
+        setRol('desconocido');
+        setNombre('');
+      })
+      .finally(() => setRolDe(userId));
   }, [userId]);
 
   useEffect(() => {
@@ -69,8 +65,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Cargando mientras se lee la sesión o mientras se averigua el rol del usuario
   const cargando = cargandoSesion || (!!userId && rolDe !== userId);
 
+  // Solo se exponen el rol y el nombre si pertenecen al usuario actual
+  const rolListo = !!userId && rolDe === userId;
+
   return (
-    <AuthContext.Provider value={{ session, rol, nombre, cargando, recargarRol }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        rol: rolListo ? rol : 'desconocido',
+        nombre: rolListo ? nombre : '',
+        cargando,
+        recargarRol,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

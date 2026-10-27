@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { supabase } from '../config/supabase';
-import { obtenerRol, Rol } from '../config/authService'; 
+import { useAuth } from '../config/AuthContext';
+import { useCarrito } from '../config/CarritoContext';
 import { colores } from '../config/tema';
 import Boton from '../Componentes/Boton';
+
+// Acceso principal según el rol del usuario
+const ACCESOS: Record<string, { ruta: string; icono: string; titulo: string; subtitulo: string }[]> = {
+  cliente: [{ ruta: 'MisPedidos', icono: '📦', titulo: 'Mis Pedidos', subtitulo: 'Ver y gestionar mis pedidos activos' }],
+  admin: [
+    { ruta: 'AdminPanel', icono: '⚙️', titulo: 'Administración', subtitulo: 'Pedidos, productos, mesas y empleados' },
+    { ruta: 'PanelMesero', icono: '🪑', titulo: 'Mesas', subtitulo: 'Tomar pedidos en mesa' },
+  ],
+  mesero: [{ ruta: 'PanelMesero', icono: '🪑', titulo: 'Mesas y pedidos', subtitulo: 'Tomar y seguir pedidos en mesa' }],
+  repartidor: [{ ruta: 'PanelRepartidor', icono: '🛵', titulo: 'Mis domicilios', subtitulo: 'Pedidos asignados para entregar' }],
+};
 
 type Producto = {
   id: number;
@@ -18,15 +30,9 @@ export default function Home({ navigation }: any) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [rol, setRol] = useState<Rol>('desconocido');
-  const [nombreUsuario, setNombreUsuario] = useState('');
-
-  useEffect(() => {
-    obtenerRol().then(({ rol, nombre }) => {
-      setRol(rol);
-      setNombreUsuario(nombre);
-    });
-  }, []);
+  const { rol, nombre: nombreUsuario } = useAuth();
+  const { agregar, cantidadTotal, total } = useCarrito();
+  const esCliente = rol === 'cliente';
 
   useEffect(() => {
     const cargar = async () => {
@@ -42,8 +48,8 @@ export default function Home({ navigation }: any) {
   }, []);
 
   const cerrarSesion = async () => {
-  await supabase.auth.signOut();
-};
+    await supabase.auth.signOut();
+  };
 
   return (
     <View style={styles.contenedor}>
@@ -53,18 +59,17 @@ export default function Home({ navigation }: any) {
         Hola {nombreUsuario || 'usuario'} · {rol}
       </Text>
 
-      {/* Acceso a la gestión de Mis Pedidos */}
-      <TouchableOpacity 
-        style={styles.cardPedidos}
-        onPress={() => navigation.navigate('MisPedidos')}
-      >
-        <Text style={{ fontSize: 20, marginRight: 10 }}>📦</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.tituloPedidos}>Mis Pedidos</Text>
-          <Text style={styles.subtituloPedidos}>Ver y gestionar mis pedidos activos</Text>
-        </View>
-        <Text style={{ fontSize: 18, color: colores.primario }}>➔</Text>
-      </TouchableOpacity>
+      {/* Accesos según el rol */}
+      {(ACCESOS[rol] ?? []).map((a) => (
+        <TouchableOpacity key={a.ruta} style={styles.cardPedidos} onPress={() => navigation.navigate(a.ruta)}>
+          <Text style={{ fontSize: 20, marginRight: 10 }}>{a.icono}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tituloPedidos}>{a.titulo}</Text>
+            <Text style={styles.subtituloPedidos}>{a.subtitulo}</Text>
+          </View>
+          <Text style={{ fontSize: 18, color: colores.primario }}>➔</Text>
+        </TouchableOpacity>
+      ))}
 
       {cargando && <ActivityIndicator size="large" color={colores.primario} />}
       {error && <Text style={styles.error}>Error: {error}</Text>}
@@ -80,10 +85,25 @@ export default function Home({ navigation }: any) {
               {item.descripcion ? <Text style={styles.descripcion}>{item.descripcion}</Text> : null}
               {item.categoria ? <Text style={styles.categoria}>{item.categoria}</Text> : null}
             </View>
-            <Text style={styles.precio}>${item.precio}</Text>
+            <View style={styles.columnaPrecio}>
+              <Text style={styles.precio}>${item.precio}</Text>
+              {esCliente && (
+                <TouchableOpacity style={styles.botonAgregar} onPress={() => agregar(item)}>
+                  <Text style={styles.textoAgregar}>+ Agregar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
       />
+
+      {/* Barra del carrito: solo aparece si hay productos */}
+      {esCliente && cantidadTotal > 0 && (
+        <TouchableOpacity style={styles.barraCarrito} onPress={() => navigation.navigate('Carrito')}>
+          <Text style={styles.textoBarra}>🛒 Ver carrito ({cantidadTotal})</Text>
+          <Text style={styles.textoBarra}>${total}</Text>
+        </TouchableOpacity>
+      )}
 
       <Boton titulo="Cerrar sesión" onPress={cerrarSesion} secundario />
     </View>
@@ -99,7 +119,7 @@ const styles = StyleSheet.create({
     backgroundColor: colores.blanco,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: colores.borde,
   },
@@ -117,7 +137,25 @@ const styles = StyleSheet.create({
   nombre: { fontSize: 16, fontWeight: '700', color: colores.texto },
   descripcion: { color: colores.gris, marginTop: 2 },
   categoria: { color: colores.primario, fontSize: 12, marginTop: 4 },
+  columnaPrecio: { alignItems: 'flex-end', justifyContent: 'space-between', marginLeft: 8 },
   precio: { fontSize: 16, fontWeight: '800', color: colores.primario },
+  botonAgregar: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: colores.primario,
+  },
+  textoAgregar: { color: colores.blanco, fontWeight: '700', fontSize: 13 },
+  barraCarrito: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: colores.texto,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  textoBarra: { color: colores.blanco, fontWeight: '700', fontSize: 15 },
   vacio: { textAlign: 'center', color: colores.gris, marginTop: 24 },
-  error: { color: 'red', marginBottom: 12 },
+  error: { color: '#C62828', marginBottom: 12 },
 });
