@@ -36,6 +36,19 @@ npx expo start -c
 ```
 Escanea el código QR con Expo Go (el celular y el computador deben estar en la misma red Wi‑Fi).
 
+### Abrir en el navegador (web)
+```bash
+npm run web        # equivale a: npx expo start --web
+```
+Se abre sola en `http://localhost:8081`. Si ya tienes `npx expo start` corriendo, presiona la tecla **w** en la terminal.
+
+En el computador el contenido se muestra centrado con un ancho máximo de 520 px. Las confirmaciones (cancelar pedido, eliminar, liberar mesa…) usan los diálogos del navegador.
+
+Para generar la versión web estática (carpeta `dist/`):
+```bash
+npx expo export --platform web
+```
+
 ### Revisión del código
 ```bash
 npx tsc --noEmit   # revisión de tipos
@@ -61,13 +74,40 @@ Los empleados no se registran desde la app: los crea el administrador en **Admin
 - Cualquier pedido se puede `cancelar`; el cliente solo puede hacerlo mientras esté `pendiente`.
 - Mesas: `libre`, `ocupada`, `reservada`. Al tomar un pedido la mesa pasa a `ocupada`.
 
+## Validaciones de formularios
+Todas las reglas están en `src/config/validaciones.ts`. Cada campo muestra su nombre arriba (etiqueta), un `*` si es obligatorio y su error en rojo debajo; el error se borra al volver a escribir en el campo.
+
+| Campo | Regla |
+|---|---|
+| Correo | Formato válido y solo dominios de `DOMINIOS_PERMITIDOS` (`gmail.com`, `hotmail.com`). Se pasa a minúsculas y sin espacios antes de validar y enviar |
+| Contraseña | Entre 6 y 12 caracteres (`PASSWORD_MIN` / `PASSWORD_MAX`), con al menos una letra y un número. En **Login** solo se revisa el largo, por las cuentas creadas antes de esta regla |
+| Confirmar contraseña | Debe coincidir con la contraseña (Registro y crear empleado) |
+| Nombre | Obligatorio, solo letras y espacios (con tildes y ñ), entre 3 y 50 caracteres |
+| Teléfono | Celular de Colombia: exactamente 10 números |
+| Dirección de entrega | Entre 5 y 100 caracteres |
+| Producto | Nombre entre 3 y 60 caracteres; precio mayor a 0 |
+| Mesa | Número y capacidad mayores a 0 |
+
+Los errores que devuelve Supabase se traducen con `mensajeErrorAuth()`.
+
+## Juego: Culebrita 🐍
+Desde el inicio, cualquier usuario con sesión puede abrir **Culebrita** (Snake estilo Nokia) mientras espera su pedido.
+
+- **Controles:** flechas en pantalla o deslizar el dedo sobre el tablero. En el navegador también funcionan las flechas del teclado, WASD y la barra espaciadora para pausar.
+- Cada comida suma 10 puntos y alarga la culebra; cada 50 puntos la velocidad aumenta.
+- Se pierde al chocar con una pared o consigo misma. El récord se guarda en el dispositivo.
+- La lógica del juego (mover, comer, chocar) está en `src/config/culebrita.ts`, separada de la pantalla.
+
 ## Estructura del proyecto
 ```
 src/
 ├── Componentes/   Componentes reutilizables (Boton, CampoTexto, Header,
-│                  EncabezadoPantalla, EtiquetaEstado, Opciones)
+│                  EncabezadoPantalla, EtiquetaEstado, Opciones,
+│                  ContenedorCentrado: ancho máximo en pantallas grandes)
 ├── config/        Cliente Supabase, tema, autenticación (AuthContext),
-│                  carrito (CarritoContext), estados y validaciones
+│                  carrito (CarritoContext), estados, validaciones,
+│                  dialogos (avisos y confirmaciones para móvil y web)
+│                  y culebrita (lógica del juego)
 ├── Navegacion/    Navegador con rutas protegidas por sesión y por rol
 ├── Pantallas/     Vistas de la aplicación
 │                  · Cliente: Home, Carrito, MisPedidos, DetallePedido
@@ -76,6 +116,7 @@ src/
 │                  · Administrador: AdminPanel, AdminPedidos, AdminProductos,
 │                    AdminMesas, AdminEmpleados
 │                  · Acceso: Login, Registro
+│                  · Todos los roles: JuegoCulebrita
 └── services/      Acceso a datos: pedidos, domicilios, empleados, mesas, productos
 ```
 

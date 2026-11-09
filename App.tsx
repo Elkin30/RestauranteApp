@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StackNavigator } from './src/Navegacion/StackNavigator';
 import { AuthProvider } from './src/config/AuthContext';
 import { CarritoProvider } from './src/config/CarritoContext';
+import ContenedorCentrado from './src/Componentes/ContenedorCentrado';
 
 export default function App() {
   return (
@@ -11,7 +12,9 @@ export default function App() {
       <CarritoProvider>
         <NavigationContainer>
           <StatusBar style="dark" />
-          <StackNavigator />
+          <ContenedorCentrado>
+            <StackNavigator />
+          </ContenedorCentrado>
         </NavigationContainer>
       </CarritoProvider>
     </AuthProvider>

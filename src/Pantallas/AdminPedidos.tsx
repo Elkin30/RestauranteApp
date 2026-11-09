@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { avisar, confirmar } from '../config/dialogos';
 import { colores } from '../config/tema';
 import { siguienteEstado, textoEstado } from '../config/estados';
 import { PedidoCompleto, obtenerPedidos, cambiarEstadoPedido } from '../services/pedidosService';
@@ -40,35 +42,37 @@ export default function AdminPedidos({ navigation }: any) {
       setDomicilios(doms);
       setRepartidores(reps);
     } catch {
-      Alert.alert('Error', 'No se pudieron cargar los pedidos.');
+      avisar('Error', 'No se pudieron cargar los pedidos.');
     } finally {
       setCargando(false);
     }
   }, [filtro]);
 
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
+  // Carga al entrar a la pantalla y cada vez que se vuelve a ella
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+    }, [cargar])
+  );
 
   const avanzar = async (p: PedidoCompleto, nuevo: string) => {
     try {
       await cambiarEstadoPedido(p.id, nuevo);
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
     }
   };
 
-  const confirmarCancelar = (p: PedidoCompleto) => {
-    Alert.alert('Cancelar pedido', `¿Cancelar el pedido #${p.id}?`, [
-      { text: 'No', style: 'cancel' },
-      { text: 'Sí, cancelar', style: 'destructive', onPress: () => avanzar(p, 'cancelado') },
-    ]);
+  const confirmarCancelar = async (p: PedidoCompleto) => {
+    if (await confirmar('Cancelar pedido', `¿Cancelar el pedido #${p.id}?`, 'Sí, cancelar')) {
+      avanzar(p, 'cancelado');
+    }
   };
 
   const abrirAsignar = (dom: Domicilio) => {
     if (repartidores.length === 0) {
-      return Alert.alert('Sin repartidores', 'Crea un empleado con rol repartidor en "Empleados".');
+      return avisar('Sin repartidores', 'Crea un empleado con rol repartidor en "Empleados".');
     }
     setAsignandoId(asignandoId === dom.id ? null : dom.id);
   };
@@ -79,7 +83,7 @@ export default function AdminPedidos({ navigation }: any) {
       setAsignandoId(null);
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo asignar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo asignar', e?.message ?? 'Inténtalo de nuevo.');
     }
   };
 

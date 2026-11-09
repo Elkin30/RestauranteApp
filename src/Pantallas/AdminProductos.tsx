@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Switch, ScrollView } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { avisar, confirmar } from '../config/dialogos';
 import { colores } from '../config/tema';
+import {
+  Errores,
+  sinErrores,
+  validarNombreProducto,
+  validarNumeroPositivo,
+  PRODUCTO_NOMBRE_MAX,
+} from '../config/validaciones';
 import {
   Producto,
   obtenerProductos,
@@ -23,6 +32,7 @@ export default function AdminProductos({ navigation }: any) {
   const [formVisible, setFormVisible] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [form, setForm] = useState(FORM_VACIO);
+  const [errores, setErrores] = useState<Errores<typeof FORM_VACIO>>({});
   const [guardando, setGuardando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -37,17 +47,28 @@ export default function AdminProductos({ navigation }: any) {
     }
   }, []);
 
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
+  // Carga al entrar a la pantalla y cada vez que se vuelve a ella
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+    }, [cargar])
+  );
+
+  // Al escribir en un campo se borra su error
+  const cambiar = (campo: keyof typeof FORM_VACIO, valor: string) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    setErrores((e) => ({ ...e, [campo]: undefined }));
+  };
 
   const abrirNuevo = () => {
+    setErrores({});
     setEditandoId(null);
     setForm(FORM_VACIO);
     setFormVisible(true);
   };
 
   const abrirEditar = (p: Producto) => {
+    setErrores({});
     setEditandoId(p.id);
     setForm({
       nombre: p.nombre,
@@ -59,9 +80,13 @@ export default function AdminProductos({ navigation }: any) {
   };
 
   const guardar = async () => {
+    const nuevos = {
+      nombre: validarNombreProducto(form.nombre),
+      precio: validarNumeroPositivo(form.precio, 'El precio'),
+    };
+    setErrores(nuevos);
+    if (!sinErrores(nuevos)) return;
     const precio = Number(form.precio);
-    if (!form.nombre.trim()) return Alert.alert('Falta el nombre', 'Escribe el nombre del producto.');
-    if (!form.precio || isNaN(precio) || precio < 0) return Alert.alert('Precio inválido', 'Escribe un precio válido.');
 
     const datos = {
       nombre: form.nombre.trim(),
@@ -76,7 +101,7 @@ export default function AdminProductos({ navigation }: any) {
       setFormVisible(false);
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo guardar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo guardar', e?.message ?? 'Inténtalo de nuevo.');
     } finally {
       setGuardando(false);
     }
@@ -89,26 +114,18 @@ export default function AdminProductos({ navigation }: any) {
       await actualizarProducto(p.id, { disponible });
     } catch {
       setProductos((lista) => lista.map((x) => (x.id === p.id ? { ...x, disponible: !disponible } : x)));
-      Alert.alert('Error', 'No se pudo cambiar la disponibilidad.');
+      avisar('Error', 'No se pudo cambiar la disponibilidad.');
     }
   };
 
-  const confirmarEliminar = (p: Producto) => {
-    Alert.alert('Eliminar producto', `¿Eliminar "${p.nombre}"?`, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await eliminarProducto(p.id);
-            cargar();
-          } catch (e: any) {
-            Alert.alert('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
-          }
-        },
-      },
-    ]);
+  const confirmarEliminar = async (p: Producto) => {
+    if (!(await confirmar('Eliminar producto', `¿Eliminar "${p.nombre}"?`, 'Eliminar'))) return;
+    try {
+      await eliminarProducto(p.id);
+      cargar();
+    } catch (e: any) {
+      avisar('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
+    }
   };
 
   if (formVisible) {
@@ -119,22 +136,35 @@ export default function AdminProductos({ navigation }: any) {
           onVolver={() => setFormVisible(false)}
           textoVolver="← Cancelar"
         />
-        <CampoTexto placeholder="Nombre" value={form.nombre} onChangeText={(v) => setForm({ ...form, nombre: v })} />
         <CampoTexto
-          placeholder="Descripción"
-          value={form.descripcion}
-          onChangeText={(v) => setForm({ ...form, descripcion: v })}
+          etiqueta="Nombre"
+          obligatorio
+          placeholder="Ej: Hamburguesa doble"
+          value={form.nombre}
+          onChangeText={(v) => cambiar('nombre', v)}
+          error={errores.nombre}
+          maxLength={PRODUCTO_NOMBRE_MAX}
         />
         <CampoTexto
-          placeholder="Precio"
+          etiqueta="Descripción"
+          placeholder="Ej: Carne, queso y tocineta"
+          value={form.descripcion}
+          onChangeText={(v) => cambiar('descripcion', v)}
+        />
+        <CampoTexto
+          etiqueta="Precio"
+          obligatorio
+          placeholder="Ej: 18000"
           value={form.precio}
-          onChangeText={(v) => setForm({ ...form, precio: v.replace(/[^0-9]/g, '') })}
+          onChangeText={(v) => cambiar('precio', v.replace(/[^0-9]/g, ''))}
+          error={errores.precio}
           keyboardType="numeric"
         />
         <CampoTexto
-          placeholder="Categoría (ej: Hamburguesas)"
+          etiqueta="Categoría"
+          placeholder="Ej: Hamburguesas"
           value={form.categoria}
-          onChangeText={(v) => setForm({ ...form, categoria: v })}
+          onChangeText={(v) => cambiar('categoria', v)}
         />
         <Boton titulo="Guardar" onPress={guardar} cargando={guardando} />
       </ScrollView>
@@ -202,5 +232,5 @@ const styles = StyleSheet.create({
   acciones: { flexDirection: 'row', gap: 16, marginTop: 8 },
   accion: { color: colores.primario, fontWeight: '700' },
   vacio: { textAlign: 'center', color: colores.gris, marginTop: 24 },
-  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
+  error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
 });

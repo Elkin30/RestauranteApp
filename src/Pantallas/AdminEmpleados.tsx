@@ -1,7 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { avisar, confirmar } from '../config/dialogos';
 import { colores } from '../config/tema';
-import { esEmailValido, mensajeErrorAuth, PASSWORD_MIN } from '../config/validaciones';
+import {
+  Errores,
+  sinErrores,
+  normalizarEmail,
+  validarNombre,
+  validarTelefono,
+  validarEmail,
+  validarPassword,
+  validarConfirmacion,
+  mensajeErrorAuth,
+  NOMBRE_MAX,
+  PASSWORD_MAX,
+  TELEFONO_DIGITOS,
+} from '../config/validaciones';
 import { useAuth } from '../config/AuthContext';
 import {
   Empleado,
@@ -22,7 +37,8 @@ const ROLES: { valor: RolEmpleado; etiqueta: string }[] = [
   { valor: 'admin', etiqueta: 'Admin' },
 ];
 
-const FORM_VACIO = { nombre: '', telefono: '', email: '', password: '', rol: 'mesero' as RolEmpleado };
+const FORM_VACIO = { nombre: '', telefono: '', email: '', password: '', confirmar: '', rol: 'mesero' as RolEmpleado };
+type CampoForm = Exclude<keyof typeof FORM_VACIO, 'rol'>;
 
 export default function AdminEmpleados({ navigation }: any) {
   const { session } = useAuth();
@@ -31,6 +47,9 @@ export default function AdminEmpleados({ navigation }: any) {
   const [formVisible, setFormVisible] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
+  // Empleado al que se le está eligiendo un nuevo rol
+  const [cambiandoRolId, setCambiandoRolId] = useState<number | null>(null);
+  const [errores, setErrores] = useState<Errores<typeof FORM_VACIO>>({});
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
@@ -38,27 +57,47 @@ export default function AdminEmpleados({ navigation }: any) {
     try {
       setEmpleados(await obtenerEmpleados());
     } catch {
-      Alert.alert('Error', 'No se pudieron cargar los empleados.');
+      avisar('Error', 'No se pudieron cargar los empleados.');
     } finally {
       setCargando(false);
     }
   }, []);
 
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
+  // Carga al entrar a la pantalla y cada vez que se vuelve a ella
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+    }, [cargar])
+  );
+
+  // Al escribir en un campo se borra su error
+  const cambiar = (campo: CampoForm, valor: string) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    setErrores((e) => ({ ...e, [campo]: undefined }));
+  };
 
   const guardar = async () => {
     setError(null);
-    if (!form.nombre.trim()) return setError('El nombre es obligatorio.');
-    if (!esEmailValido(form.email)) return setError('Escribe un correo válido.');
-    if (form.password.length < PASSWORD_MIN) {
-      return setError(`La contraseña debe tener mínimo ${PASSWORD_MIN} caracteres.`);
-    }
+    const nuevos = {
+      nombre: validarNombre(form.nombre),
+      telefono: validarTelefono(form.telefono),
+      email: validarEmail(form.email),
+      password: validarPassword(form.password),
+      confirmar: validarConfirmacion(form.password, form.confirmar),
+    };
+    setErrores(nuevos);
+    if (!sinErrores(nuevos)) return;
+
     setGuardando(true);
     try {
-      await crearEmpleado(form);
-      Alert.alert('Empleado creado', `${form.nombre} ya puede iniciar sesión con su correo.`);
+      await crearEmpleado({
+        nombre: form.nombre,
+        telefono: form.telefono,
+        email: normalizarEmail(form.email),
+        password: form.password,
+        rol: form.rol,
+      });
+      avisar('Empleado creado', `${form.nombre} ya puede iniciar sesión con su correo.`);
       setForm(FORM_VACIO);
       setFormVisible(false);
       cargar();
@@ -70,63 +109,85 @@ export default function AdminEmpleados({ navigation }: any) {
     }
   };
 
-  const elegirRol = (emp: Empleado) => {
-    Alert.alert(`Rol de ${emp.nombre}`, 'Elige el nuevo rol', [
-      ...ROLES.filter((r) => r.valor !== emp.rol).map((r) => ({
-        text: r.etiqueta,
-        onPress: async () => {
-          try {
-            await cambiarRolEmpleado(emp.id, r.valor);
-            cargar();
-          } catch (e: any) {
-            Alert.alert('No se pudo cambiar', e?.message ?? 'Inténtalo de nuevo.');
-          }
-        },
-      })),
-      { text: 'Cancelar', style: 'cancel' as const },
-    ]);
+  const cambiarRol = async (emp: Empleado, rol: RolEmpleado) => {
+    if (rol === emp.rol) return;
+    const etiqueta = ROLES.find((r) => r.valor === rol)?.etiqueta ?? rol;
+    if (!(await confirmar('Cambiar rol', `¿Cambiar a ${emp.nombre} al rol ${etiqueta}?`, 'Cambiar'))) return;
+    try {
+      await cambiarRolEmpleado(emp.id, rol);
+      setCambiandoRolId(null);
+      cargar();
+    } catch (e: any) {
+      avisar('No se pudo cambiar', e?.message ?? 'Inténtalo de nuevo.');
+    }
   };
 
-  const confirmarEliminar = (emp: Empleado) => {
-    Alert.alert('Eliminar empleado', `¿Quitar a ${emp.nombre} del personal? Ya no podrá usar la app como empleado.`, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await eliminarEmpleado(emp.id);
-            cargar();
-          } catch (e: any) {
-            Alert.alert('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
-          }
-        },
-      },
-    ]);
+  const confirmarEliminar = async (emp: Empleado) => {
+    const ok = await confirmar(
+      'Eliminar empleado',
+      `¿Quitar a ${emp.nombre} del personal? Ya no podrá usar la app como empleado.`,
+      'Eliminar'
+    );
+    if (!ok) return;
+    try {
+      await eliminarEmpleado(emp.id);
+      cargar();
+    } catch (e: any) {
+      avisar('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
+    }
   };
 
   if (formVisible) {
     return (
       <ScrollView style={styles.contenedor} contentContainerStyle={{ paddingBottom: 40 }}>
         <EncabezadoPantalla titulo="Nuevo empleado" onVolver={() => setFormVisible(false)} textoVolver="← Cancelar" />
-        <CampoTexto placeholder="Nombre" value={form.nombre} onChangeText={(v) => setForm({ ...form, nombre: v })} />
         <CampoTexto
-          placeholder="Teléfono"
-          value={form.telefono}
-          onChangeText={(v) => setForm({ ...form, telefono: v })}
-          keyboardType="phone-pad"
+          etiqueta="Nombre"
+          obligatorio
+          placeholder="Ej: Carlos Gómez"
+          value={form.nombre}
+          onChangeText={(v) => cambiar('nombre', v)}
+          error={errores.nombre}
+          maxLength={NOMBRE_MAX}
         />
         <CampoTexto
-          placeholder="Correo (con este inicia sesión)"
+          etiqueta="Teléfono celular"
+          obligatorio
+          placeholder="3001234567"
+          value={form.telefono}
+          onChangeText={(v) => cambiar('telefono', v.replace(/\D/g, ''))}
+          error={errores.telefono}
+          keyboardType="phone-pad"
+          maxLength={TELEFONO_DIGITOS}
+        />
+        <CampoTexto
+          etiqueta="Correo (con este inicia sesión)"
+          obligatorio
+          placeholder="nombre@gmail.com"
           value={form.email}
-          onChangeText={(v) => setForm({ ...form, email: v })}
+          onChangeText={(v) => cambiar('email', v)}
+          error={errores.email}
           autoCapitalize="none"
           keyboardType="email-address"
         />
         <CampoTexto
-          placeholder={`Contraseña inicial (mín. ${PASSWORD_MIN})`}
+          etiqueta="Contraseña inicial"
+          obligatorio
+          placeholder="6 a 12 caracteres, letras y números"
           value={form.password}
-          onChangeText={(v) => setForm({ ...form, password: v })}
+          onChangeText={(v) => cambiar('password', v)}
+          error={errores.password}
+          maxLength={PASSWORD_MAX}
+          secureTextEntry
+        />
+        <CampoTexto
+          etiqueta="Confirmar contraseña"
+          obligatorio
+          placeholder="Repite la contraseña"
+          value={form.confirmar}
+          onChangeText={(v) => cambiar('confirmar', v)}
+          error={errores.confirmar}
+          maxLength={PASSWORD_MAX}
           secureTextEntry
         />
         <Text style={styles.etiqueta}>Rol</Text>
@@ -144,6 +205,7 @@ export default function AdminEmpleados({ navigation }: any) {
         titulo="+ Nuevo empleado"
         onPress={() => {
           setError(null);
+          setErrores({});
           setFormVisible(true);
         }}
       />
@@ -158,25 +220,33 @@ export default function AdminEmpleados({ navigation }: any) {
           const esYo = item.auth_id === session?.user.id;
           return (
             <View style={styles.tarjeta}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nombre}>
-                  {item.nombre}
-                  {esYo ? ' (tú)' : ''}
-                </Text>
-                <Text style={styles.detalle}>
-                  {item.rol}
-                  {item.telefono ? ` · ${item.telefono}` : ''}
-                </Text>
+              <View style={styles.fila}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nombre}>
+                    {item.nombre}
+                    {esYo ? ' (tú)' : ''}
+                  </Text>
+                  <Text style={styles.detalle}>
+                    {item.rol}
+                    {item.telefono ? ` · ${item.telefono}` : ''}
+                  </Text>
+                </View>
+                {/* El admin no puede cambiarse el rol ni eliminarse a sí mismo */}
+                {!esYo && (
+                  <View style={styles.acciones}>
+                    <TouchableOpacity onPress={() => setCambiandoRolId(cambiandoRolId === item.id ? null : item.id)}>
+                      <Text style={styles.accion}>{cambiandoRolId === item.id ? 'Cerrar' : 'Rol'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => confirmarEliminar(item)}>
+                      <Text style={[styles.accion, { color: colores.error }]}>Eliminar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-              {/* El admin no puede cambiarse el rol ni eliminarse a sí mismo */}
-              {!esYo && (
-                <View style={styles.acciones}>
-                  <TouchableOpacity onPress={() => elegirRol(item)}>
-                    <Text style={styles.accion}>Rol</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => confirmarEliminar(item)}>
-                    <Text style={[styles.accion, { color: '#C62828' }]}>Eliminar</Text>
-                  </TouchableOpacity>
+              {cambiandoRolId === item.id && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={[styles.detalle, { marginBottom: 6 }]}>Elige el nuevo rol:</Text>
+                  <Opciones opciones={ROLES} seleccionada={item.rol} onCambiar={(rol) => cambiarRol(item, rol)} />
                 </View>
               )}
             </View>
@@ -190,8 +260,6 @@ export default function AdminEmpleados({ navigation }: any) {
 const styles = StyleSheet.create({
   contenedor: { flex: 1, padding: 20, paddingTop: 56, backgroundColor: colores.fondo },
   tarjeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colores.blanco,
     borderRadius: 12,
     padding: 14,
@@ -199,11 +267,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colores.borde,
   },
+  fila: { flexDirection: 'row', alignItems: 'center' },
   nombre: { fontSize: 16, fontWeight: '700', color: colores.texto },
   detalle: { color: colores.gris, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
   acciones: { flexDirection: 'row', gap: 16 },
   accion: { color: colores.primario, fontWeight: '700' },
   etiqueta: { fontWeight: '700', color: colores.texto, marginBottom: 8 },
   vacio: { textAlign: 'center', color: colores.gris, marginTop: 24 },
-  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
+  error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
 });

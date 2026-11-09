@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { avisar, confirmar } from '../config/dialogos';
 import { useFocusEffect } from '@react-navigation/native';
 import { colores } from '../config/tema';
 import { COLOR_ESTADO, siguienteEstado, textoEstado } from '../config/estados';
@@ -7,11 +8,22 @@ import { Mesa, obtenerMesas, cambiarEstadoMesa } from '../services/mesasService'
 import { PedidoCompleto, obtenerPedidos, cambiarEstadoPedido } from '../services/pedidosService';
 import EncabezadoPantalla from '../Componentes/EncabezadoPantalla';
 import EtiquetaEstado from '../Componentes/EtiquetaEstado';
+import Opciones from '../Componentes/Opciones';
+
+type AccionMesa = 'pedido' | 'liberar' | 'cerrar';
+
+const ACCIONES_MESA: { valor: AccionMesa; etiqueta: string }[] = [
+  { valor: 'pedido', etiqueta: 'Nuevo pedido' },
+  { valor: 'liberar', etiqueta: 'Liberar mesa' },
+  { valor: 'cerrar', etiqueta: 'Cerrar' },
+];
 
 export default function PanelMesero({ navigation }: any) {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [pedidos, setPedidos] = useState<PedidoCompleto[]>([]);
   const [cargando, setCargando] = useState(true);
+  // Mesa ocupada o reservada que se tocó: sus acciones aparecen debajo de la grilla
+  const [mesaElegida, setMesaElegida] = useState<Mesa | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -20,7 +32,7 @@ export default function PanelMesero({ navigation }: any) {
       setMesas(m);
       setPedidos(p);
     } catch {
-      Alert.alert('Error', 'No se pudieron cargar las mesas.');
+      avisar('Error', 'No se pudieron cargar las mesas.');
     } finally {
       setCargando(false);
     }
@@ -33,29 +45,37 @@ export default function PanelMesero({ navigation }: any) {
     }, [cargar])
   );
 
-  const tocarMesa = (mesa: Mesa) => {
-    const tomarPedido = () => navigation.navigate('PedidoMesa', { mesaId: mesa.id, numeroMesa: mesa.numero_mesa });
-    if (mesa.estado === 'libre') return tomarPedido();
+  const tomarPedido = (mesa: Mesa) =>
+    navigation.navigate('PedidoMesa', { mesaId: mesa.id, numeroMesa: mesa.numero_mesa });
 
-    Alert.alert(`Mesa ${mesa.numero_mesa}`, `Estado: ${mesa.estado}`, [
-      { text: 'Nuevo pedido', onPress: tomarPedido },
-      {
-        text: 'Liberar mesa',
-        onPress: async () => {
-          const pendientes = pedidos.filter((p) => p.mesa_id === mesa.id);
-          if (pendientes.length > 0) {
-            return Alert.alert('Mesa con pedidos', 'Entrega o cancela sus pedidos antes de liberarla.');
-          }
-          try {
-            await cambiarEstadoMesa(mesa.id, 'libre');
-            cargar();
-          } catch {
-            Alert.alert('Error', 'No se pudo liberar la mesa.');
-          }
-        },
-      },
-      { text: 'Cerrar', style: 'cancel' },
-    ]);
+  const tocarMesa = (mesa: Mesa) => {
+    if (mesa.estado === 'libre') {
+      setMesaElegida(null);
+      return tomarPedido(mesa);
+    }
+    setMesaElegida(mesaElegida?.id === mesa.id ? null : mesa);
+  };
+
+  const liberarMesa = async (mesa: Mesa) => {
+    const pendientes = pedidos.filter((p) => p.mesa_id === mesa.id);
+    if (pendientes.length > 0) {
+      return avisar('Mesa con pedidos', 'Entrega o cancela sus pedidos antes de liberarla.');
+    }
+    if (!(await confirmar('Liberar mesa', `¿Marcar la mesa ${mesa.numero_mesa} como libre?`, 'Liberar'))) return;
+    try {
+      await cambiarEstadoMesa(mesa.id, 'libre');
+      setMesaElegida(null);
+      cargar();
+    } catch {
+      avisar('Error', 'No se pudo liberar la mesa.');
+    }
+  };
+
+  const elegirAccion = (accion: AccionMesa) => {
+    if (!mesaElegida) return;
+    if (accion === 'pedido') tomarPedido(mesaElegida);
+    if (accion === 'liberar') liberarMesa(mesaElegida);
+    else setMesaElegida(null);
   };
 
   const avanzar = async (p: PedidoCompleto, nuevo: string) => {
@@ -63,7 +83,7 @@ export default function PanelMesero({ navigation }: any) {
       await cambiarEstadoPedido(p.id, nuevo);
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
     }
   };
 
@@ -94,6 +114,13 @@ export default function PanelMesero({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </View>
+            {mesaElegida && (
+              <View style={styles.panelMesa}>
+                <Text style={styles.nombre}>Mesa {mesaElegida.numero_mesa}</Text>
+                <Text style={styles.ayuda}>Estado: {mesaElegida.estado}</Text>
+                <Opciones opciones={ACCIONES_MESA} seleccionada={null} onCambiar={elegirAccion} />
+              </View>
+            )}
             <Text style={styles.subtitulo}>Pedidos activos</Text>
           </View>
         }
@@ -140,6 +167,14 @@ const styles = StyleSheet.create({
   },
   numeroMesa: { fontSize: 22, fontWeight: '800', color: colores.texto },
   estadoMesa: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  panelMesa: {
+    backgroundColor: colores.blanco,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colores.primario,
+  },
   subtitulo: { fontSize: 18, fontWeight: '800', color: colores.texto, marginBottom: 10 },
   tarjeta: {
     backgroundColor: colores.blanco,

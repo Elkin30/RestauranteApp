@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { avisar } from '../config/dialogos';
 import { useFocusEffect } from '@react-navigation/native';
 import { colores } from '../config/tema';
 import {
@@ -24,7 +25,7 @@ export default function PanelRepartidor({ navigation }: any) {
     try {
       setDomicilios(await obtenerMisDomicilios());
     } catch {
-      Alert.alert('Error', 'No se pudieron cargar tus domicilios.');
+      avisar('Error', 'No se pudieron cargar tus domicilios.');
     } finally {
       setCargando(false);
     }
@@ -41,7 +42,7 @@ export default function PanelRepartidor({ navigation }: any) {
       await accion();
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo actualizar', e?.message ?? 'Inténtalo de nuevo.');
     }
   };
 

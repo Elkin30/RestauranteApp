@@ -17,6 +17,14 @@ const ACCESOS: Record<string, { ruta: string; icono: string; titulo: string; sub
   repartidor: [{ ruta: 'PanelRepartidor', icono: '🛵', titulo: 'Mis domicilios', subtitulo: 'Pedidos asignados para entregar' }],
 };
 
+// Tarjeta del juego: visible para todos los roles
+const ACCESO_JUEGO = {
+  ruta: 'JuegoCulebrita',
+  icono: '🐍',
+  titulo: 'Culebrita',
+  subtitulo: 'Juega mientras llega tu pedido',
+};
+
 type Producto = {
   id: number;
   nombre: string;
@@ -60,7 +68,7 @@ export default function Home({ navigation }: any) {
       </Text>
 
       {/* Accesos según el rol */}
-      {(ACCESOS[rol] ?? []).map((a) => (
+      {[...(ACCESOS[rol] ?? []), ACCESO_JUEGO].map((a) => (
         <TouchableOpacity key={a.ruta} style={styles.cardPedidos} onPress={() => navigation.navigate(a.ruta)}>
           <Text style={{ fontSize: 20, marginRight: 10 }}>{a.icono}</Text>
           <View style={{ flex: 1 }}>

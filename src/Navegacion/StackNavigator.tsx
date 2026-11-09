@@ -15,6 +15,7 @@ import AdminPedidos from '../Pantallas/AdminPedidos';
 import PanelMesero from '../Pantallas/PanelMesero';
 import PedidoMesa from '../Pantallas/PedidoMesa';
 import PanelRepartidor from '../Pantallas/PanelRepartidor';
+import JuegoCulebrita from '../Pantallas/JuegoCulebrita';
 import { useAuth } from '../config/AuthContext';
 import { colores } from '../config/tema';
 
@@ -33,6 +34,7 @@ export type RootStackParamList = {
   PanelMesero: undefined;
   PedidoMesa: { mesaId: number; numeroMesa: number };
   PanelRepartidor: undefined;
+  JuegoCulebrita: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -56,6 +58,7 @@ export const StackNavigator = () => {
           <Stack.Screen name="MisPedidos" component={MisPedidos as any} />
           <Stack.Screen name="Carrito" component={Carrito as any} />
           <Stack.Screen name="DetallePedido" component={DetallePedido as any} />
+          <Stack.Screen name="JuegoCulebrita" component={JuegoCulebrita as any} />
 
           {/* Rutas por rol: solo existen para quien tiene ese rol */}
           {rol === 'admin' && (

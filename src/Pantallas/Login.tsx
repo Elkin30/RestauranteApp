@@ -4,33 +4,45 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../Navegacion/StackNavigator';
 import { supabase } from '../config/supabase';
 import { colores } from '../config/tema';
-import { esEmailValido, mensajeErrorAuth, PASSWORD_MIN } from '../config/validaciones';
+import {
+  Errores,
+  sinErrores,
+  normalizarEmail,
+  validarEmail,
+  validarPasswordLogin,
+  mensajeErrorAuth,
+  PASSWORD_MAX,
+} from '../config/validaciones';
 import Boton from '../Componentes/Boton';
 import CampoTexto from '../Componentes/CampoTexto';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
+const FORM_VACIO = { email: '', password: '' };
+
 export default function Login({ navigation }: Props) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [form, setForm] = useState(FORM_VACIO);
+  const [errores, setErrores] = useState<Errores<typeof FORM_VACIO>>({});
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Al escribir en un campo se borra su error
+  const cambiar = (campo: keyof typeof FORM_VACIO, valor: string) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    setErrores((e) => ({ ...e, [campo]: undefined }));
+  };
+
   const iniciarSesion = async () => {
     setError(null);
-    if (!esEmailValido(email)) {
-      setError('Escribe un correo válido.');
-      return;
-    }
-    if (password.length < PASSWORD_MIN) {
-      setError(`La contraseña debe tener mínimo ${PASSWORD_MIN} caracteres.`);
-      return;
-    }
+    const nuevos = { email: validarEmail(form.email), password: validarPasswordLogin(form.password) };
+    setErrores(nuevos);
+    if (!sinErrores(nuevos)) return;
+
     setCargando(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: normalizarEmail(form.email),
+        password: form.password,
       });
       if (error) setError(mensajeErrorAuth(error.message));
       // Si sale bien, AuthContext detecta la sesión y la app pasa sola al Home.
@@ -47,16 +59,23 @@ export default function Login({ navigation }: Props) {
       <Text style={styles.subtitulo}>Inicia sesión para pedir</Text>
 
       <CampoTexto
-        placeholder="Correo"
-        value={email}
-        onChangeText={setEmail}
+        etiqueta="Correo"
+        obligatorio
+        placeholder="nombre@gmail.com"
+        value={form.email}
+        onChangeText={(v) => cambiar('email', v)}
+        error={errores.email}
         autoCapitalize="none"
         keyboardType="email-address"
       />
       <CampoTexto
-        placeholder="Contraseña"
-        value={password}
-        onChangeText={setPassword}
+        etiqueta="Contraseña"
+        obligatorio
+        placeholder="Tu contraseña"
+        value={form.password}
+        onChangeText={(v) => cambiar('password', v)}
+        error={errores.password}
+        maxLength={PASSWORD_MAX}
         secureTextEntry
       />
 
@@ -73,5 +92,5 @@ const styles = StyleSheet.create({
   contenedor: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colores.fondo },
   titulo: { fontSize: 32, fontWeight: '800', color: colores.primario, textAlign: 'center' },
   subtitulo: { fontSize: 16, color: colores.gris, textAlign: 'center', marginBottom: 32 },
-  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
+  error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
 });

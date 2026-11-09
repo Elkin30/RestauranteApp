@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { avisar } from '../config/dialogos';
 import { useCarrito } from '../config/CarritoContext';
 import { crearPedidoDomicilio } from '../services/pedidosService';
 import { colores } from '../config/tema';
+import { validarDireccion, DIRECCION_MAX } from '../config/validaciones';
 import Boton from '../Componentes/Boton';
 import CampoTexto from '../Componentes/CampoTexto';
 
@@ -10,6 +12,7 @@ export default function Carrito({ navigation }: any) {
   const { items, total, agregar, quitar, vaciar } = useCarrito();
   const [direccion, setDireccion] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [errorDireccion, setErrorDireccion] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
 
   const confirmarPedido = async () => {
@@ -18,16 +21,15 @@ export default function Carrito({ navigation }: any) {
       setError('Agrega productos al carrito.');
       return;
     }
-    if (direccion.trim().length < 5) {
-      setError('Escribe la dirección de entrega.');
-      return;
-    }
+    const errorDir = validarDireccion(direccion);
+    setErrorDireccion(errorDir);
+    if (errorDir) return;
     setEnviando(true);
     try {
       const pedidoId = await crearPedidoDomicilio(items, direccion);
       vaciar();
       setDireccion('');
-      Alert.alert('¡Pedido enviado!', `Tu pedido #${pedidoId} quedó registrado.`);
+      avisar('¡Pedido enviado!', `Tu pedido #${pedidoId} quedó registrado.`);
       navigation.navigate('MisPedidos');
     } catch (e: any) {
       setError(e?.message ?? 'No se pudo crear el pedido. Inténtalo de nuevo.');
@@ -69,7 +71,18 @@ export default function Carrito({ navigation }: any) {
       {items.length > 0 && (
         <View>
           <Text style={styles.total}>Total: ${total}</Text>
-          <CampoTexto placeholder="Dirección de entrega" value={direccion} onChangeText={setDireccion} />
+          <CampoTexto
+            etiqueta="Dirección de entrega"
+            obligatorio
+            placeholder="Ej: Calle 10 # 5-20, apto 301"
+            value={direccion}
+            onChangeText={(v) => {
+              setDireccion(v);
+              setErrorDireccion(undefined);
+            }}
+            error={errorDireccion}
+            maxLength={DIRECCION_MAX}
+          />
           {error && <Text style={styles.error}>{error}</Text>}
           <Boton titulo="Confirmar pedido" onPress={confirmarPedido} cargando={enviando} />
         </View>
@@ -108,5 +121,5 @@ const styles = StyleSheet.create({
   textoCantidad: { color: colores.primario, fontSize: 18, fontWeight: '700' },
   cantidad: { marginHorizontal: 12, fontSize: 16, fontWeight: '700', color: colores.texto },
   total: { fontSize: 20, fontWeight: '800', color: colores.texto, marginVertical: 12, textAlign: 'right' },
-  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
+  error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
 });

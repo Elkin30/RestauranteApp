@@ -5,4 +5,5 @@ export const colores = {
   gris: '#8A8A8A',
   blanco: '#FFFFFF',
   borde: '#E5DDD3',
+  error: '#C62828',
 };

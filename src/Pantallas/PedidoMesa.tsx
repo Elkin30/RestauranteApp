@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { avisar } from '../config/dialogos';
 import { colores } from '../config/tema';
 import { ItemCarrito } from '../config/CarritoContext';
 import { Producto, obtenerProductos } from '../services/productosService';
@@ -17,7 +18,7 @@ export default function PedidoMesa({ navigation, route }: any) {
   useEffect(() => {
     obtenerProductos()
       .then((lista) => setProductos(lista.filter((p) => p.disponible)))
-      .catch(() => Alert.alert('Error', 'No se pudo cargar el menú.'));
+      .catch(() => avisar('Error', 'No se pudo cargar el menú.'));
   }, []);
 
   const cambiar = (id: number, delta: number) =>
@@ -29,14 +30,14 @@ export default function PedidoMesa({ navigation, route }: any) {
   const total = items.reduce((s, i) => s + i.producto.precio * i.cantidad, 0);
 
   const enviar = async () => {
-    if (items.length === 0) return Alert.alert('Pedido vacío', 'Agrega al menos un producto.');
+    if (items.length === 0) return avisar('Pedido vacío', 'Agrega al menos un producto.');
     setEnviando(true);
     try {
       const id = await crearPedidoMesa(mesaId, items);
-      Alert.alert('Pedido enviado', `Pedido #${id} para la mesa ${numeroMesa}.`);
+      avisar('Pedido enviado', `Pedido #${id} para la mesa ${numeroMesa}.`);
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('No se pudo enviar', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo enviar', e?.message ?? 'Inténtalo de nuevo.');
     } finally {
       setEnviando(false);
     }

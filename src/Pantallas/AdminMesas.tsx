@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { avisar, confirmar } from '../config/dialogos';
 import { colores } from '../config/tema';
+import { Errores, sinErrores, validarNumeroPositivo } from '../config/validaciones';
 import { Mesa, obtenerMesas, crearMesa, eliminarMesa } from '../services/mesasService';
 import EncabezadoPantalla from '../Componentes/EncabezadoPantalla';
 import EtiquetaEstado from '../Componentes/EtiquetaEstado';
@@ -12,6 +15,7 @@ export default function AdminMesas({ navigation }: any) {
   const [cargando, setCargando] = useState(true);
   const [numero, setNumero] = useState('');
   const [capacidad, setCapacidad] = useState('4');
+  const [errores, setErrores] = useState<Errores<{ numero: string; capacidad: string }>>({});
   const [guardando, setGuardando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -19,49 +23,46 @@ export default function AdminMesas({ navigation }: any) {
     try {
       setMesas(await obtenerMesas());
     } catch {
-      Alert.alert('Error', 'No se pudieron cargar las mesas.');
+      avisar('Error', 'No se pudieron cargar las mesas.');
     } finally {
       setCargando(false);
     }
   }, []);
 
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
+  // Carga al entrar a la pantalla y cada vez que se vuelve a ella
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+    }, [cargar])
+  );
 
   const agregar = async () => {
-    const n = Number(numero);
-    const c = Number(capacidad);
-    if (!n || n <= 0) return Alert.alert('Número inválido', 'Escribe el número de la mesa.');
-    if (!c || c <= 0) return Alert.alert('Capacidad inválida', 'La capacidad debe ser mayor a 0.');
+    const nuevos = {
+      numero: validarNumeroPositivo(numero, 'El número de mesa'),
+      capacidad: validarNumeroPositivo(capacidad, 'La capacidad'),
+    };
+    setErrores(nuevos);
+    if (!sinErrores(nuevos)) return;
     setGuardando(true);
     try {
-      await crearMesa(n, c);
+      await crearMesa(Number(numero), Number(capacidad));
       setNumero('');
       cargar();
     } catch (e: any) {
-      Alert.alert('No se pudo crear', e?.message ?? 'Inténtalo de nuevo.');
+      avisar('No se pudo crear', e?.message ?? 'Inténtalo de nuevo.');
     } finally {
       setGuardando(false);
     }
   };
 
-  const confirmarEliminar = (m: Mesa) => {
-    Alert.alert('Eliminar mesa', `¿Eliminar la mesa ${m.numero_mesa}?`, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await eliminarMesa(m.id);
-            cargar();
-          } catch (e: any) {
-            Alert.alert('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
-          }
-        },
-      },
-    ]);
+  const confirmarEliminar = async (m: Mesa) => {
+    if (!(await confirmar('Eliminar mesa', `¿Eliminar la mesa ${m.numero_mesa}?`, 'Eliminar'))) return;
+    try {
+      await eliminarMesa(m.id);
+      cargar();
+    } catch (e: any) {
+      avisar('No se pudo eliminar', e?.message ?? 'Inténtalo de nuevo.');
+    }
   };
 
   return (
@@ -71,17 +72,29 @@ export default function AdminMesas({ navigation }: any) {
       <View style={styles.formulario}>
         <View style={{ flex: 1 }}>
           <CampoTexto
-            placeholder="N° mesa"
+            etiqueta="N° de mesa"
+            obligatorio
+            placeholder="Ej: 5"
             value={numero}
-            onChangeText={(v) => setNumero(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => {
+              setNumero(v.replace(/[^0-9]/g, ''));
+              setErrores((e) => ({ ...e, numero: undefined }));
+            }}
+            error={errores.numero}
             keyboardType="numeric"
           />
         </View>
         <View style={{ flex: 1 }}>
           <CampoTexto
-            placeholder="Capacidad"
+            etiqueta="Capacidad"
+            obligatorio
+            placeholder="Ej: 4"
             value={capacidad}
-            onChangeText={(v) => setCapacidad(v.replace(/[^0-9]/g, ''))}
+            onChangeText={(v) => {
+              setCapacidad(v.replace(/[^0-9]/g, ''));
+              setErrores((e) => ({ ...e, capacidad: undefined }));
+            }}
+            error={errores.capacidad}
             keyboardType="numeric"
           />
         </View>

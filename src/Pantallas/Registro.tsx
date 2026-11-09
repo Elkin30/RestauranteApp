@@ -1,43 +1,61 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { avisar } from '../config/dialogos';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../Navegacion/StackNavigator';
 import { supabase } from '../config/supabase';
 import { colores } from '../config/tema';
-import { esEmailValido, mensajeErrorAuth, PASSWORD_MIN } from '../config/validaciones';
+import {
+  Errores,
+  sinErrores,
+  normalizarEmail,
+  validarNombre,
+  validarTelefono,
+  validarEmail,
+  validarPassword,
+  validarConfirmacion,
+  mensajeErrorAuth,
+  NOMBRE_MAX,
+  PASSWORD_MAX,
+  TELEFONO_DIGITOS,
+} from '../config/validaciones';
 import Boton from '../Componentes/Boton';
 import CampoTexto from '../Componentes/CampoTexto';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registro'>;
 
+const FORM_VACIO = { nombre: '', telefono: '', email: '', password: '', confirmar: '' };
+
 export default function Registro({ navigation }: Props) {
-  const [nombre, setNombre] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [form, setForm] = useState(FORM_VACIO);
+  const [errores, setErrores] = useState<Errores<typeof FORM_VACIO>>({});
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Al escribir en un campo se borra su error
+  const cambiar = (campo: keyof typeof FORM_VACIO, valor: string) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    setErrores((e) => ({ ...e, [campo]: undefined }));
+  };
+
   const registrar = async () => {
     setError(null);
-    if (!nombre.trim()) {
-      setError('El nombre es obligatorio.');
-      return;
-    }
-    if (!esEmailValido(email)) {
-      setError('Escribe un correo válido.');
-      return;
-    }
-    if (password.length < PASSWORD_MIN) {
-      setError(`La contraseña debe tener mínimo ${PASSWORD_MIN} caracteres.`);
-      return;
-    }
+    const nuevos = {
+      nombre: validarNombre(form.nombre),
+      telefono: validarTelefono(form.telefono),
+      email: validarEmail(form.email),
+      password: validarPassword(form.password),
+      confirmar: validarConfirmacion(form.password, form.confirmar),
+    };
+    setErrores(nuevos);
+    if (!sinErrores(nuevos)) return;
+
     setCargando(true);
     try {
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { nombre: nombre.trim(), telefono: telefono.trim() } },
+        email: normalizarEmail(form.email),
+        password: form.password,
+        options: { data: { nombre: form.nombre.trim(), telefono: form.telefono.trim() } },
       });
       if (error) {
         setError(mensajeErrorAuth(error.message));
@@ -45,7 +63,7 @@ export default function Registro({ navigation }: Props) {
       }
       if (!data.session) {
         // Solo pasa si la confirmación de correo está activada
-        Alert.alert('Cuenta creada', 'Revisa tu correo para confirmar la cuenta y luego inicia sesión.');
+        avisar('Cuenta creada', 'Revisa tu correo para confirmar la cuenta y luego inicia sesión.');
         navigation.navigate('Login');
       }
       // Si hay sesión, la app entra sola al Home.
@@ -57,24 +75,73 @@ export default function Registro({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.contenedor}>
+    <ScrollView
+      style={{ backgroundColor: colores.fondo }}
+      contentContainerStyle={styles.contenedor}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.titulo}>Crear cuenta</Text>
-      <CampoTexto placeholder="Nombre" value={nombre} onChangeText={setNombre} />
-      <CampoTexto placeholder="Teléfono" value={telefono} onChangeText={setTelefono} keyboardType="phone-pad" />
-      <CampoTexto placeholder="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <CampoTexto placeholder={`Contraseña (mín. ${PASSWORD_MIN})`} value={password} onChangeText={setPassword} secureTextEntry />
+      <CampoTexto
+        etiqueta="Nombre"
+        obligatorio
+        placeholder="Ej: María Pérez"
+        value={form.nombre}
+        onChangeText={(v) => cambiar('nombre', v)}
+        error={errores.nombre}
+        maxLength={NOMBRE_MAX}
+      />
+      <CampoTexto
+        etiqueta="Teléfono celular"
+        obligatorio
+        placeholder="3001234567"
+        value={form.telefono}
+        onChangeText={(v) => cambiar('telefono', v.replace(/\D/g, ''))}
+        error={errores.telefono}
+        keyboardType="phone-pad"
+        maxLength={TELEFONO_DIGITOS}
+      />
+      <CampoTexto
+        etiqueta="Correo"
+        obligatorio
+        placeholder="nombre@gmail.com"
+        value={form.email}
+        onChangeText={(v) => cambiar('email', v)}
+        error={errores.email}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+      <CampoTexto
+        etiqueta="Contraseña"
+        obligatorio
+        placeholder="6 a 12 caracteres, letras y números"
+        value={form.password}
+        onChangeText={(v) => cambiar('password', v)}
+        error={errores.password}
+        maxLength={PASSWORD_MAX}
+        secureTextEntry
+      />
+      <CampoTexto
+        etiqueta="Confirmar contraseña"
+        obligatorio
+        placeholder="Repite la contraseña"
+        value={form.confirmar}
+        onChangeText={(v) => cambiar('confirmar', v)}
+        error={errores.confirmar}
+        maxLength={PASSWORD_MAX}
+        secureTextEntry
+      />
 
       {error && <Text style={styles.error}>{error}</Text>}
 
       <Boton titulo="Registrarme" onPress={registrar} cargando={cargando} />
       <View style={{ height: 12 }} />
       <Boton titulo="Volver" onPress={() => navigation.goBack()} secundario />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  contenedor: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colores.fondo },
+  contenedor: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   titulo: { fontSize: 28, fontWeight: '800', color: colores.texto, marginBottom: 24 },
-  error: { color: '#C62828', marginBottom: 12, textAlign: 'center' },
+  error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
 });

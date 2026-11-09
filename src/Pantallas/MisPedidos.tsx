@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { avisar, confirmar } from '../config/dialogos';
 import { Header } from '../Componentes/Header';
 import { obtenerMisPedidos, cancelarPedido, Pedido } from '../services/pedidosService';
 import { colores } from '../config/tema';
@@ -27,22 +28,14 @@ export const MisPedidos = ({ navigation }: any) => {
     cargarPedidos();
   };
 
-  const handleCancelar = (id: number) => {
-    Alert.alert('Cancelar Pedido', '¿Deseas cancelar este pedido?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Sí, cancelar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await cancelarPedido(id);
-          } catch (e: any) {
-            Alert.alert('No se pudo cancelar', e?.message ?? 'Inténtalo de nuevo.');
-          }
-          recargarPedidos();
-        },
-      },
-    ]);
+  const handleCancelar = async (id: number) => {
+    if (!(await confirmar('Cancelar pedido', '¿Deseas cancelar este pedido?', 'Sí, cancelar'))) return;
+    try {
+      await cancelarPedido(id);
+    } catch (e: any) {
+      avisar('No se pudo cancelar', e?.message ?? 'Inténtalo de nuevo.');
+    }
+    recargarPedidos();
   };
 
   return (
