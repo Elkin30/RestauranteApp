@@ -17,7 +17,7 @@ const ACCESOS: Record<string, { ruta: string; icono: string; titulo: string; sub
   repartidor: [{ ruta: 'PanelRepartidor', icono: '🛵', titulo: 'Mis domicilios', subtitulo: 'Pedidos asignados para entregar' }],
 };
 
-// Tarjeta del juego: visible para todos los roles
+// Tarjeta del juego: visible para todos los roles (también se abre desde el Login sin sesión)
 const ACCESO_JUEGO = {
   ruta: 'JuegoCulebrita',
   icono: '🐍',

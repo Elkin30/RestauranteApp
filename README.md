@@ -91,7 +91,7 @@ Todas las reglas están en `src/config/validaciones.ts`. Cada campo muestra su n
 Los errores que devuelve Supabase se traducen con `mensajeErrorAuth()`.
 
 ## Juego: Culebrita 🐍
-Desde el inicio, cualquier usuario con sesión puede abrir **Culebrita** (Snake estilo Nokia) mientras espera su pedido.
+Cualquier persona puede jugar **Culebrita** (Snake estilo Nokia): sin cuenta, desde el enlace de la pantalla de **Login**, y con sesión iniciada, desde la tarjeta del inicio (para todos los roles).
 
 - **Controles:** flechas en pantalla o deslizar el dedo sobre el tablero. En el navegador también funcionan las flechas del teclado, WASD y la barra espaciadora para pausar.
 - Cada comida suma 10 puntos y alarga la culebra; cada 50 puntos la velocidad aumenta.
@@ -116,7 +116,7 @@ src/
 │                  · Administrador: AdminPanel, AdminPedidos, AdminProductos,
 │                    AdminMesas, AdminEmpleados
 │                  · Acceso: Login, Registro
-│                  · Todos los roles: JuegoCulebrita
+│                  · Todos, con o sin sesión: JuegoCulebrita
 └── services/      Acceso a datos: pedidos, domicilios, empleados, mesas, productos
 ```
 

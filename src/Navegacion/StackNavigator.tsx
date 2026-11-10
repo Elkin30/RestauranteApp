@@ -58,7 +58,6 @@ export const StackNavigator = () => {
           <Stack.Screen name="MisPedidos" component={MisPedidos as any} />
           <Stack.Screen name="Carrito" component={Carrito as any} />
           <Stack.Screen name="DetallePedido" component={DetallePedido as any} />
-          <Stack.Screen name="JuegoCulebrita" component={JuegoCulebrita as any} />
 
           {/* Rutas por rol: solo existen para quien tiene ese rol */}
           {rol === 'admin' && (
@@ -86,6 +85,9 @@ export const StackNavigator = () => {
           <Stack.Screen name="Registro" component={Registro as any} />
         </>
       )}
+
+      {/* El juego es libre: se puede abrir desde el Login sin iniciar sesión */}
+      <Stack.Screen name="JuegoCulebrita" component={JuegoCulebrita as any} />
     </Stack.Navigator>
   );
 };

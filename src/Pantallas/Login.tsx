@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../Navegacion/StackNavigator';
 import { supabase } from '../config/supabase';
@@ -84,6 +84,11 @@ export default function Login({ navigation }: Props) {
       <Boton titulo="Entrar" onPress={iniciarSesion} cargando={cargando} />
       <View style={{ height: 12 }} />
       <Boton titulo="Crear cuenta" onPress={() => navigation.navigate('Registro')} secundario />
+
+      {/* El juego no necesita cuenta */}
+      <TouchableOpacity style={styles.juego} onPress={() => navigation.navigate('JuegoCulebrita')}>
+        <Text style={styles.textoJuego}>🐍 Jugar Culebrita (sin iniciar sesión)</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -93,4 +98,6 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 32, fontWeight: '800', color: colores.primario, textAlign: 'center' },
   subtitulo: { fontSize: 16, color: colores.gris, textAlign: 'center', marginBottom: 32 },
   error: { color: colores.error, marginBottom: 12, textAlign: 'center' },
+  juego: { marginTop: 24, padding: 8, alignItems: 'center' },
+  textoJuego: { color: colores.primario, fontWeight: '700', fontSize: 15 },
 });
